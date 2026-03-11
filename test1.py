@@ -4,15 +4,21 @@ import plotly.express as px
 import plotly.graph_objects as go
 import numpy as np
 
-# --- PAGE CONFIGURATION ---
+# ----------------------------------------------------
+# PAGE CONFIGURATION
+# ----------------------------------------------------
 st.set_page_config(page_title="AI Sustainability Dashboard", layout="wide")
 
-# --- DASHBOARD HEADER ---
+# ----------------------------------------------------
+# HEADER
+# ----------------------------------------------------
 st.title("🟢 Executive AI Sustainability Dashboard")
 st.markdown("Monitor, analyze, and optimize corporate AI usage to reduce environmental impact.")
 st.markdown("---")
 
-# --- HERO METRICS ---
+# ----------------------------------------------------
+# HERO METRICS
+# ----------------------------------------------------
 hero_metrics = {
     "Score": 85.8,
     "MSE": 93.3,
@@ -26,20 +32,21 @@ with col1:
     st.metric("Corporate Sustainability Score", f"{hero_metrics['Score']} / 100", "Good")
 
 with col2:
-    st.metric("Model Selection Efficiency (MSE)", f"{hero_metrics['MSE']}%", "+8.3% vs Last Month")
+    st.metric("Model Selection Efficiency", f"{hero_metrics['MSE']}%", "+8.3% vs Last Month")
 
 with col3:
-    st.metric("Daily Carbon Footprint (CFD)", f"{hero_metrics['CFD']} g CO2", "-0.2g vs Last Month")
+    st.metric("Daily Carbon Footprint", f"{hero_metrics['CFD']} g CO2", "-0.2g vs Last Month")
 
 with col4:
-    st.metric("Time-of-Use Awareness (TUA)", f"{hero_metrics['TUA']}%", "Peak Green Hours")
+    st.metric("Time-of-Use Awareness", f"{hero_metrics['TUA']}%", "Peak Green Hours")
 
 st.markdown("---")
 
-# --- SIDEBAR CONTROLS ---
+# ----------------------------------------------------
+# SIDEBAR CONTROLS
+# ----------------------------------------------------
 st.sidebar.header("⚙ AI Emission Controls")
 
-# Adjustable emissions
 deepseek = st.sidebar.slider("DeepSeek CO2 per Query (g)", 0.01, 10.0, 5.0)
 gpt4 = st.sidebar.slider("GPT-4 CO2 per Query (g)", 0.01, 5.0, 0.5)
 claude_opus = st.sidebar.slider("Claude 3 Opus CO2 per Query (g)", 0.01, 5.0, 0.5)
@@ -52,10 +59,8 @@ gemini_flash = st.sidebar.slider("Gemini Flash CO2 per Query (g)", 0.01, 1.0, 0.
 
 st.sidebar.markdown("---")
 
-# NEW CONTROL
 queries = st.sidebar.slider("Total Daily AI Queries", 100, 10000, 1000, step=100)
 
-# Migration simulator
 migration_pct = st.sidebar.slider(
     "GPT-4 Queries Migrated → Gemini Flash (%)",
     0,
@@ -64,11 +69,15 @@ migration_pct = st.sidebar.slider(
     step=5
 )
 
-# --- QUERY DISTRIBUTION ---
+# ----------------------------------------------------
+# QUERY DISTRIBUTION
+# ----------------------------------------------------
 gpt4_queries = queries * (1 - migration_pct/100)
 gemini_flash_queries = queries * (migration_pct/100)
 
-# --- TOTAL EMISSIONS CALCULATION ---
+# ----------------------------------------------------
+# TOTAL EMISSIONS
+# ----------------------------------------------------
 total_emissions = {
     "DeepSeek": deepseek * queries * 0.02,
     "GPT-4": gpt4 * gpt4_queries,
@@ -86,17 +95,22 @@ model_emissions = pd.DataFrame({
     "Total CO2 (g)": list(total_emissions.values())
 }).sort_values(by="Total CO2 (g)", ascending=True)
 
-# --- RADAR PARAMETERS ---
-parameters = ['Query Frequency (QF)', 'Model Selection (MSE)', 'Query Complexity (QCS)',
-              'Time-of-Use (TUA)', 'Daily Carbon (CFD)', 'Session Efficiency (SDE)']
+# ----------------------------------------------------
+# RADAR PARAMETERS
+# ----------------------------------------------------
+parameters = ['Query Frequency', 'Model Selection', 'Query Complexity',
+              'Time-of-Use', 'Daily Carbon', 'Session Efficiency']
 
 weights = [20, 25, 15, 10, 20, 10]
 user_performance = [18, 23, 14, 8, 17, 8]
 
-# --- VISUALIZATION ROW ---
+# ----------------------------------------------------
+# MAIN VISUALIZATION
+# ----------------------------------------------------
 col_left, col_right = st.columns(2)
 
 with col_left:
+
     st.subheader("Algorithm Parameter Breakdown")
 
     fig_radar = go.Figure()
@@ -105,14 +119,14 @@ with col_left:
         r=weights,
         theta=parameters,
         fill='toself',
-        name='Max Weight Allocation'
+        name='Max Allocation'
     ))
 
     fig_radar.add_trace(go.Scatterpolar(
         r=user_performance,
         theta=parameters,
         fill='toself',
-        name='Current Corporate Performance'
+        name='Current Performance'
     ))
 
     fig_radar.update_layout(
@@ -122,6 +136,7 @@ with col_left:
     st.plotly_chart(fig_radar, use_container_width=True)
 
 with col_right:
+
     st.subheader("Total CO2 Emissions by AI Model")
 
     fig_bar = px.bar(
@@ -134,19 +149,62 @@ with col_right:
         text="Total CO2 (g)"
     )
 
-    fig_bar.update_layout(
-        xaxis_title="Total CO2 Emissions (grams)",
-        yaxis_title="AI Model"
-    )
-
     st.plotly_chart(fig_bar, use_container_width=True)
 
 st.markdown("---")
 
-# --- TEMPORAL CARBON ANALYSIS ---
+# ----------------------------------------------------
+# EXECUTIVE RISK GAUGE
+# ----------------------------------------------------
+st.subheader("AI Sustainability Risk Indicator")
+
+fig = go.Figure(go.Indicator(
+    mode="gauge+number",
+    value=hero_metrics["Score"],
+    title={'text': "Sustainability Score"},
+    gauge={
+        'axis': {'range': [0,100]},
+        'steps': [
+            {'range': [0,60], 'color': "red"},
+            {'range': [60,80], 'color': "yellow"},
+            {'range': [80,100], 'color': "lightgreen"}
+        ],
+    }
+))
+
+st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("---")
+
+# ----------------------------------------------------
+# INDUSTRY BENCHMARK
+# ----------------------------------------------------
+st.subheader("AI Sustainability Benchmark vs Industry")
+
+benchmark_data = pd.DataFrame({
+    "Metric": ["Carbon per 1000 Queries", "Sustainable Model Usage", "Green Energy Usage"],
+    "Company": [420, 72, 64],
+    "Industry Avg": [650, 48, 55]
+})
+
+fig_benchmark = px.bar(
+    benchmark_data,
+    x="Metric",
+    y=["Company", "Industry Avg"],
+    barmode="group"
+)
+
+st.plotly_chart(fig_benchmark, use_container_width=True)
+
+st.markdown("---")
+
+# ----------------------------------------------------
+# TEMPORAL CARBON ANALYSIS
+# ----------------------------------------------------
 col_bottom_left, col_bottom_right = st.columns(2)
 
 with col_bottom_left:
+
     st.subheader("Temporal Carbon Intensity")
 
     hours = list(range(24))
@@ -177,9 +235,12 @@ with col_bottom_left:
 
     st.plotly_chart(fig_area, use_container_width=True)
 
-# --- STRATEGY SIMULATOR ---
+# ----------------------------------------------------
+# STRATEGY SIMULATOR
+# ----------------------------------------------------
 with col_bottom_right:
-    st.subheader("Strategy Simulator: Migration Impact")
+
+    st.subheader("Strategy Simulator")
 
     original_emissions = queries * gpt4
 
@@ -197,3 +258,22 @@ with col_bottom_right:
     st.success(f"Projected Model Efficiency Increase: **+{efficiency_gain:.2f}%**")
 
     st.metric("Total Queries Analysed", queries)
+
+st.markdown("---")
+
+# ----------------------------------------------------
+# AI RECOMMENDATION ENGINE
+# ----------------------------------------------------
+st.subheader("AI Sustainability Recommendations")
+
+if migration_pct < 40:
+    st.warning("⚠ Increase lightweight model migration to reduce emissions.")
+
+if queries > 5000:
+    st.info("💡 High AI usage detected. Consider batching requests or lighter models.")
+
+if savings > 200:
+    st.success("✅ Current strategy significantly reduces carbon emissions.")
+
+if hero_metrics["Score"] > 80:
+    st.success("🌱 Your AI infrastructure is operating sustainably.")
