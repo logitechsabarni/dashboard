@@ -13,13 +13,10 @@ from streamlit_autorefresh import st_autorefresh
 st_autorefresh(interval=5000, key="dashboardrefresh")
 
 
-import google.generativeai as genai
 
-# configure API
-genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
+from google import genai
 
-# load model
-gemini_model = genai.GenerativeModel("gemini-pro")
+client = genai.Client(api_key=st.secrets["GEMINI_API_KEY"])
 
 # ----------------------------------------------------
 # PAGE CONFIG
@@ -349,20 +346,23 @@ question = st.text_input("Ask a question about AI sustainability")
 if st.button("Generate Insight"):
 
     prompt = f"""
-You are an expert AI sustainability analyst.
+You are an AI sustainability expert helping companies reduce carbon emissions from AI systems.
 
-Here is the company AI dashboard data:
+Here is the dashboard data:
 
 {dashboard_data}
 
-User Question:
+User question:
 {question}
 
-Provide sustainability insights and recommendations.
+Give clear sustainability recommendations.
 """
 
     try:
-        response = gemini_model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
 
         st.success("AI Insight")
         st.write(response.text)
