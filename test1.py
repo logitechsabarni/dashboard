@@ -5,11 +5,16 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 from streamlit_autorefresh import st_autorefresh
+from openai import OpenAI
 
 # ----------------------------------------------------
 # AUTO REFRESH
 # ----------------------------------------------------
 st_autorefresh(interval=5000, key="dashboardrefresh")
+# ----------------------------------------------------
+# OPENAI API SETUP
+# ----------------------------------------------------
+client = OpenAI(api_key="YOUR_API_KEY_HERE")
 
 # ----------------------------------------------------
 # PAGE CONFIG
@@ -314,3 +319,52 @@ if len(log_df)>40:
     st.error("⚠ High AI traffic detected")
 else:
     st.success("🌱 AI usage within sustainable limits")
+# ----------------------------------------------------
+# AI SUSTAINABILITY INSIGHTS (LLM ANALYSIS)
+# ----------------------------------------------------
+st.markdown("---")
+
+# ----------------------------------------------------
+# AI SUSTAINABILITY INSIGHTS
+# ----------------------------------------------------
+st.header("🤖 AI Sustainability Insights")
+
+# Dashboard data summary for AI
+dashboard_data = f"""
+Total Queries: {queries}
+Migration Percentage: {migration_pct}
+Total Daily CO2 Emissions: {total_daily_emissions:.2f} grams
+Average CO2 per Query: {daily_carbon:.4f} grams
+Live CO2 Emissions: {total_live_co2:.3f}
+Sustainability Score: {sustainability_score:.2f}
+"""
+
+question = st.text_input("Ask a question about AI sustainability")
+
+if st.button("Generate Insight"):
+
+    response = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {
+                "role":"system",
+                "content":"You are an expert AI sustainability analyst helping companies reduce AI carbon emissions."
+            },
+            {
+                "role":"user",
+                "content":f"""
+Here is the company AI dashboard data:
+
+{dashboard_data}
+
+User Question:
+{question}
+"""
+            }
+        ]
+    )
+
+    answer = response.choices[0].message.content
+
+    st.success("AI Insight")
+    st.write(answer)
