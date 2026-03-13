@@ -343,28 +343,41 @@ question = st.text_input("Ask a question about AI sustainability")
 
 if st.button("Generate Insight"):
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role":"system",
-                "content":"You are an expert AI sustainability analyst helping companies reduce AI carbon emissions."
-            },
-            {
-                "role":"user",
-                "content":f"""
+    if question.strip() == "":
+        st.warning("Please enter a question before generating insight.")
+    
+    else:
+        try:
+            with st.spinner("Analyzing sustainability data..."):
+
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": "You are an expert AI sustainability analyst helping companies reduce AI carbon emissions."
+                        },
+                        {
+                            "role": "user",
+                            "content": f"""
 Here is the company AI dashboard data:
 
 {dashboard_data}
 
 User Question:
 {question}
+
+Provide clear sustainability recommendations.
 """
-            }
-        ]
-    )
+                        }
+                    ]
+                )
 
-    answer = response.choices[0].message.content
+                answer = response.choices[0].message.content
 
-    st.success("AI Insight")
-    st.write(answer)
+                st.success("AI Insight")
+                st.write(answer)
+
+        except Exception as e:
+            st.error("Error generating AI insight. Please check your API key or internet connection.")
+            st.text(str(e))
