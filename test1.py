@@ -5,7 +5,7 @@ import plotly.graph_objects as go
 import numpy as np
 import datetime
 from streamlit_autorefresh import st_autorefresh
-from openai import OpenAI
+
 
 # ----------------------------------------------------
 # AUTO REFRESH
