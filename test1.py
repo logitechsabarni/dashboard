@@ -12,12 +12,14 @@ from streamlit_autorefresh import st_autorefresh
 # ----------------------------------------------------
 st_autorefresh(interval=5000, key="dashboardrefresh")
 
-import google.generativeai as genai
-import streamlit as st
 
+import google.generativeai as genai
+
+# configure API
 genai.configure(api_key=st.secrets["GEMINI_API_KEY"])
 
-gemini_model = genai.GenerativeModel("gemini-1.5-flash")
+# load model
+gemini_model = genai.GenerativeModel("gemini-pro")
 
 # ----------------------------------------------------
 # PAGE CONFIG
