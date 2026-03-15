@@ -92,6 +92,7 @@ with col1:
     st.metric(
         label="Corporate Sustainability Score",
         value=f"{hero_metrics['Score']:.2f} / 100",
+        delta=f"+{score_delta:.2f} vs Last Month"
         delta_color="normal"
     )
 
