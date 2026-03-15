@@ -85,22 +85,21 @@ col1, col2, col3, col4 = st.columns(4)
 with col1:
     st.metric(
     label="Corporate Sustainability Score",
-    value=f"{hero_metrics['Score']} / 100",
-    delta="Good",
+    f"{hero_metrics['Score']:.2f} / 100",
     delta_color="normal"
     )
 
 with col2:
     st.metric(
     label="Model Selection Efficiency (MSE)",
-    value=f"{hero_metrics['MSE']}%",
+    f"{hero_metrics['MSE']:.2f}%",
     delta=f"+{migration_pct*0.15:.1f}% vs Last Month"
     )
 
 with col3:
     st.metric(
     label="Daily Carbon Footprint (CFD)",
-    value=f"{hero_metrics['CFD']} g CO2",
+    f"{hero_metrics['CFD']:.3f} g CO2",
     delta=f"-{migration_pct*0.05:.2f}g vs Last Month",
     delta_color="inverse"
     )
@@ -108,7 +107,7 @@ with col3:
 with col4:
     st.metric(
     label="Time-of-Use Awareness (TUA)",
-    value=f"{hero_metrics['TUA']}%",
+    f"{hero_metrics['TUA']:.2f}%",
     delta="Peak Green Hours"
     )
 
