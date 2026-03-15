@@ -79,6 +79,12 @@ sustainability_score = max(0, 100 - (total_daily_emissions / 50))
 model_efficiency = 70 + (migration_pct * 0.3)
 daily_carbon = total_daily_emissions / queries
 time_use = min(100, 50 + (migration_pct * 0.5))
+hero_metrics = {
+    "Score": sustainability_score,
+    "MSE": model_efficiency,
+    "CFD": daily_carbon,
+    "TUA": time_use
+}
 
 col1, col2, col3, col4 = st.columns(4)
 
