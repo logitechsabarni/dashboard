@@ -82,10 +82,36 @@ time_use = min(100, 50 + (migration_pct * 0.5))
 
 col1, col2, col3, col4 = st.columns(4)
 
-col1.metric("Corporate Sustainability Score", f"{sustainability_score:.2f} / 100")
-col2.metric("Model Selection Efficiency", f"{model_efficiency:.2f}%")
-col3.metric("Daily Carbon Footprint", f"{daily_carbon:.3f} g CO2")
-col4.metric("Time-of-Use Awareness", f"{time_use:.2f}%")
+with col1:
+    st.metric(
+    label="Corporate Sustainability Score",
+    value=f"{hero_metrics['Score']} / 100",
+    delta="Good",
+    delta_color="normal"
+    )
+
+with col2:
+    st.metric(
+    label="Model Selection Efficiency (MSE)",
+    value=f"{hero_metrics['MSE']}%",
+    delta=f"+{migration_pct*0.15:.1f}% vs Last Month"
+    )
+
+with col3:
+    st.metric(
+    label="Daily Carbon Footprint (CFD)",
+    value=f"{hero_metrics['CFD']} g CO2",
+    delta=f"-{migration_pct*0.05:.2f}g vs Last Month",
+    delta_color="inverse"
+    )
+
+with col4:
+    st.metric(
+    label="Time-of-Use Awareness (TUA)",
+    value=f"{hero_metrics['TUA']}%",
+    delta="Peak Green Hours"
+    )
+
 
 st.markdown("---")
 
