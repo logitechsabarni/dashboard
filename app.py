@@ -105,34 +105,38 @@ with tab1:
     chart = st.empty()
     status_box = st.empty()
 
+    # -------- INIT TIME INDEX --------
+    if "last_time" not in st.session_state:
+        st.session_state.last_time = pd.Timestamp.now()
+
     if st.session_state.running:
 
         for _ in range(500):
 
-            now = pd.Timestamp.now()
+            # -------- TIME UPDATE --------
+            now = st.session_state.last_time + pd.Timedelta(seconds=1)
+            st.session_state.last_time = now
+
             mode = st.session_state.mode
             factor = intensity
 
-            # -------- DATA GENERATION --------
+            # -------- DATA GENERATION (SMOOTHER + REALISTIC) --------
+            base_q = np.random.randint(40, 80)
+
             if mode == "spike":
-                queries = np.random.randint(120,180) * factor
-                co2 = np.random.randint(80,110)
-                power = np.random.randint(350,450)
-
+                queries = base_q + np.random.randint(60, 100) * factor
             elif mode == "low":
-                queries = np.random.randint(10,40)
-                co2 = np.random.randint(10,30)
-                power = np.random.randint(150,250)
-
+                queries = max(10, base_q - np.random.randint(20, 40) * factor)
             elif mode == "high":
-                queries = np.random.randint(150,220)
-                co2 = np.random.randint(60,90)
-                power = np.random.randint(300,450)
-
+                queries = base_q + np.random.randint(40, 70) * factor
             else:
-                queries = np.random.randint(40,100)
-                co2 = np.random.randint(20,60)
-                power = np.random.randint(200,350)
+                queries = base_q + np.random.randint(-10, 20)
+
+            co2 = int(queries * 0.5 + np.random.randint(-5, 10))
+            power = int(queries * 2 + np.random.randint(50, 100))
+
+            co2 = max(10, min(co2, 120))
+            power = max(100, min(power, 500))
 
             new_row = {
                 "time": now,
@@ -147,14 +151,15 @@ with tab1:
             ).tail(window)
 
             df = st.session_state.data.copy()
-            latest = df.iloc[-1]
 
-            # -------- STATUS --------
-            if latest["co2"] > 80:
+            # -------- STATUS (STABLE) --------
+            avg_co2 = df["co2"].tail(5).mean()
+
+            if avg_co2 > 85:
                 status = "🔴 CRITICAL"
-            elif latest["co2"] > 60:
+            elif avg_co2 > 65:
                 status = "🟠 HIGH"
-            elif latest["co2"] > 40:
+            elif avg_co2 > 45:
                 status = "🟡 MEDIUM"
             else:
                 status = "🟢 LOW"
@@ -165,7 +170,7 @@ with tab1:
             rolling_mean = df["co2"].rolling(5).mean().fillna(0)
             rolling_std = df["co2"].rolling(5).std().fillna(0)
 
-            anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
+            anomalies = df[df["co2"] > (rolling_mean + 2 * rolling_std)]
 
             # -------- GRAPH --------
             fig = go.Figure()
@@ -210,11 +215,10 @@ with tab1:
                 margin=dict(l=10, r=10, t=40, b=10)
             )
 
-            # ✅ FIX: FORCE RENDER
-            chart.empty()
-            chart.plotly_chart(fig, use_container_width=True, key=str(time.time()))
+            # ✅ SMOOTH UPDATE (NO FLICKER)
+            chart.plotly_chart(fig, use_container_width=True)
 
-            time.sleep(1)
+            time.sleep(0.8)
 
             if not st.session_state.running:
                 break
@@ -223,6 +227,20 @@ with tab1:
     df = st.session_state.data.copy()
 
     if not df.empty:
+
+        avg_co2 = df["co2"].tail(5).mean()
+
+        if avg_co2 > 85:
+            status = "🔴 CRITICAL"
+        elif avg_co2 > 65:
+            status = "🟠 HIGH"
+        elif avg_co2 > 45:
+            status = "🟡 MEDIUM"
+        else:
+            status = "🟢 LOW"
+
+        status_box.markdown(f"### System Status: {status}")
+
         fig = go.Figure()
 
         fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
