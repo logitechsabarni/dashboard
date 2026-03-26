@@ -103,20 +103,9 @@ with tab1:
     st.subheader("⚡ Live System Monitoring")
 
     chart = st.empty()
-    log_box = st.empty()
     status_box = st.empty()
 
-    # store logs
-    if "logs" not in st.session_state:
-        st.session_state.logs = []
-
-    if "start_time" not in st.session_state:
-        st.session_state.start_time = None
-
     if st.session_state.running:
-
-        if st.session_state.start_time is None:
-            st.session_state.start_time = pd.Timestamp.now()
 
         for _ in range(500):
 
@@ -157,50 +146,62 @@ with tab1:
                 ignore_index=True
             ).tail(window)
 
-            df = st.session_state.data
+            df = st.session_state.data.copy()
+            latest = df.iloc[-1]
 
-            # -------- LOGGING --------
-            log_entry = f"{now.strftime('%H:%M:%S')} | Mode={mode} | CO2={co2}"
-            st.session_state.logs.insert(0, log_entry)
-            st.session_state.logs = st.session_state.logs[:10]
-
-            # -------- STATUS --------
-            if co2 > 80:
+            # -------- STATUS CLASSIFICATION --------
+            if latest["co2"] > 80:
                 status = "🔴 CRITICAL"
-            elif co2 > 50:
-                status = "🟡 WARNING"
+                color = "red"
+            elif latest["co2"] > 60:
+                status = "🟠 HIGH"
+                color = "orange"
+            elif latest["co2"] > 40:
+                status = "🟡 MEDIUM"
+                color = "yellow"
             else:
-                status = "🟢 STABLE"
+                status = "🟢 LOW"
+                color = "green"
 
             status_box.markdown(f"### System Status: {status}")
 
-            # -------- ANOMALY --------
-            rolling_mean = df["co2"].rolling(5).mean()
-            rolling_std = df["co2"].rolling(5).std()
-            anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
+            # -------- SAFE ANOMALY --------
+            rolling_mean = df["co2"].rolling(5).mean().fillna(0)
+            rolling_std = df["co2"].rolling(5).std().fillna(0)
 
-            # -------- PREDICTION --------
-            future_x = pd.date_range(start=now, periods=10, freq="S")
-            future_y = np.linspace(co2, co2-10, 10)
+            anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
 
             # -------- GRAPH --------
             fig = go.Figure()
 
+            # CO2 line
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["co2"],
-                name="CO2", line=dict(color="red", width=3)
+                name="CO2",
+                line=dict(color="red", width=3)
             ))
 
+            # Queries
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["queries"],
-                name="Queries"
+                name="Queries",
+                line=dict(color="blue")
             ))
 
+            # Power
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["power"],
-                name="Power"
+                name="Power",
+                line=dict(color="green")
             ))
 
+            # -------- ZONES --------
+            fig.add_hrect(y0=0, y1=40, fillcolor="green", opacity=0.08)
+            fig.add_hrect(y0=40, y1=60, fillcolor="yellow", opacity=0.08)
+            fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
+            fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
+
+            # -------- ANOMALY --------
             fig.add_trace(go.Scatter(
                 x=anomalies["time"],
                 y=anomalies["co2"],
@@ -209,27 +210,45 @@ with tab1:
                 name="Anomaly"
             ))
 
-            fig.add_trace(go.Scatter(
-                x=future_x,
-                y=future_y,
-                mode="lines",
-                line=dict(dash="dash"),
-                name="Prediction"
-            ))
-
-            fig.update_layout(height=420)
+            fig.update_layout(
+                height=420,
+                title=f"Live Monitoring | Status: {status}"
+            )
 
             chart.plotly_chart(fig, use_container_width=True)
-
-            # -------- LOG PANEL --------
-            log_box.markdown("### 📜 Event Log")
-            log_box.write(st.session_state.logs)
 
             time.sleep(1)
 
             if not st.session_state.running:
                 break
 
+    # -------- KEEP LAST GRAPH AFTER STOP --------
+    df = st.session_state.data.copy()
+
+    if not df.empty:
+        fig = go.Figure()
+
+        fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
+        fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
+        fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
+
+        fig.add_hrect(y0=0, y1=40, fillcolor="green", opacity=0.08)
+        fig.add_hrect(y0=40, y1=60, fillcolor="yellow", opacity=0.08)
+        fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
+        fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
+
+        chart.plotly_chart(fig, use_container_width=True)
+
+    # ✅ KEEP LAST GRAPH AFTER STOP
+    df = st.session_state.data.copy()
+
+    if not df.empty:
+        fig = go.Figure()
+        fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
+        fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
+        fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
+
+        chart.plotly_chart(fig, use_container_width=True)
 # ================= ANALYTICS =================
 with tab2:
 
@@ -272,72 +291,130 @@ with tab2:
 # ================= ADVANCED =================
 with tab3:
 
-    df = st.session_state.data
-
     st.subheader("📈 Advanced System Insights")
 
-    # -------- 3D SCATTER --------
-    st.markdown("### 🌐 3D System View")
+    df = st.session_state.data.copy()
 
-    fig3d = px.scatter_3d(
-        df,
-        x="time",
-        y="queries",
-        z="co2",
-        color="power",
-        size="queries"
-    )
+    # -------- CLEAN DATA --------
+    df["queries"] = pd.to_numeric(df["queries"], errors="coerce")
+    df["co2"] = pd.to_numeric(df["co2"], errors="coerce")
+    df["power"] = pd.to_numeric(df["power"], errors="coerce")
 
-    st.plotly_chart(fig3d, use_container_width=True)
+    df = df.dropna()
 
-    # -------- BUBBLE CHART --------
-    st.markdown("### 🔵 Load vs Emissions")
+    if len(df) < 8:
+        st.warning("Not enough data for advanced visualization")
+    else:
+        import plotly.express as px
 
-    fig_bubble = px.scatter(
-        df,
-        x="queries",
-        y="co2",
-        size="power",
-        color="power",
-        hover_data=["time"]
-    )
+        # -------- MAKE TIME CLEAN --------
+        df = df.reset_index(drop=True)
+        df["index"] = df.index
 
-    st.plotly_chart(fig_bubble, use_container_width=True)
+        df_sample = df.iloc[::2]  # reduce clutter
 
-    # -------- SYSTEM STRESS GAUGE --------
-    st.markdown("### ⚡ System Stress Indicator")
+        # ================= 1. 3D SYSTEM VIEW =================
+        st.markdown("### 🌐 3D System View")
 
-    stress = min(100, int(df["co2"].iloc[-1]))
+        fig3d = px.scatter_3d(
+            df_sample,
+            x="index",
+            y="queries",
+            z="co2",
+            color="power",
+            size="queries",
+            color_continuous_scale="Turbo"
+        )
 
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=stress,
-        title={"text": "CO2 Stress Level"},
-        gauge={
-            "axis": {"range": [0,100]},
-            "bar": {"color": "red"},
-            "steps": [
-                {"range": [0,40], "color": "green"},
-                {"range": [40,70], "color": "yellow"},
-                {"range": [70,100], "color": "red"},
-            ],
-        }
-    ))
+        fig3d.update_traces(marker=dict(size=6, opacity=0.8))
 
-    st.plotly_chart(gauge, use_container_width=True)
+        fig3d.update_layout(
+            template="plotly_dark",
+            height=450,
+            scene=dict(
+                xaxis_title="Time",
+                yaxis_title="Queries",
+                zaxis_title="CO2"
+            ),
+            scene_camera=dict(eye=dict(x=1.5, y=1.5, z=1.2))
+        )
 
-    # -------- ANOMALY DENSITY --------
-    st.markdown("### 🚨 Anomaly Density")
+        st.plotly_chart(fig3d, use_container_width=True)
 
-    rolling_mean = df["co2"].rolling(5).mean()
-    rolling_std = df["co2"].rolling(5).std()
+        # ================= 2. LOAD VS EMISSIONS =================
+        st.markdown("### 🔵 Load vs Emissions")
 
-    anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
+        fig_bubble = px.scatter(
+            df,
+            x="queries",
+            y="co2",
+            size="power",
+            color="power",
+            hover_data=["index"],
+            color_continuous_scale="Turbo"
+        )
 
-    st.write(f"Total anomalies detected: {len(anomalies)}")
+        fig_bubble.update_traces(marker=dict(opacity=0.75))
 
-    st.bar_chart(anomalies[["co2"]])
+        fig_bubble.update_layout(
+            template="plotly_dark",
+            height=400
+        )
 
+        st.plotly_chart(fig_bubble, use_container_width=True)
+
+        # ================= 3. SYSTEM STRESS GAUGE =================
+        st.markdown("### ⚡ System Stress Indicator")
+
+        stress = int(min(100, df["co2"].iloc[-1]))
+
+        gauge = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=stress,
+            title={"text": "CO2 Stress Level"},
+            gauge={
+                "axis": {"range": [0,100]},
+                "bar": {"color": "red"},
+                "steps": [
+                    {"range": [0,40], "color": "green"},
+                    {"range": [40,70], "color": "yellow"},
+                    {"range": [70,100], "color": "red"},
+                ],
+            }
+        ))
+
+        gauge.update_layout(height=300)
+
+        st.plotly_chart(gauge, use_container_width=True)
+
+        # ================= 4. ANOMALY DENSITY =================
+        st.markdown("### 🚨 Anomaly Density")
+
+        rolling_mean = df["co2"].rolling(5).mean().fillna(df["co2"])
+        rolling_std = df["co2"].rolling(5).std().fillna(0)
+
+        anomalies = df[df["co2"] > (rolling_mean + 1.5 * rolling_std)]
+
+        # fallback (important for demo)
+        if anomalies.empty:
+            anomalies = df.sort_values("co2", ascending=False).head(3)
+
+        st.write(f"Total anomalies detected: {len(anomalies)}")
+
+        fig_anom = px.bar(
+            anomalies,
+            x="index",
+            y="co2",
+            color="co2",
+            color_continuous_scale="Reds"
+        )
+
+        fig_anom.update_layout(
+            template="plotly_dark",
+            height=350
+        )
+
+        st.plotly_chart(fig_anom, use_container_width=True)
 # ================= AI =================
 with tab4:
 
