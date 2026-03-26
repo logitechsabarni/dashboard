@@ -100,23 +100,38 @@ tab1, tab2, tab3, tab4 = st.tabs([
 # ================= REAL-TIME =================
 with tab1:
 
+    st.subheader("⚡ Live System Monitoring")
+
     chart = st.empty()
+    log_box = st.empty()
+    status_box = st.empty()
+
+    # store logs
+    if "logs" not in st.session_state:
+        st.session_state.logs = []
+
+    if "start_time" not in st.session_state:
+        st.session_state.start_time = None
 
     if st.session_state.running:
 
+        if st.session_state.start_time is None:
+            st.session_state.start_time = pd.Timestamp.now()
+
         for _ in range(500):
 
+            now = pd.Timestamp.now()
             mode = st.session_state.mode
             factor = intensity
 
-            # -------- MODE LOGIC (FIXED) --------
+            # -------- DATA GENERATION --------
             if mode == "spike":
                 queries = np.random.randint(120,180) * factor
                 co2 = np.random.randint(80,110)
                 power = np.random.randint(350,450)
 
             elif mode == "low":
-                queries = np.random.randint(10,40) // factor
+                queries = np.random.randint(10,40)
                 co2 = np.random.randint(10,30)
                 power = np.random.randint(150,250)
 
@@ -131,35 +146,60 @@ with tab1:
                 power = np.random.randint(200,350)
 
             new_row = {
-                "time": df["time"].iloc[-1] + 1,
+                "time": now,
                 "queries": queries,
                 "co2": co2,
                 "power": power
             }
 
             st.session_state.data = pd.concat(
-                [df, pd.DataFrame([new_row])],
+                [st.session_state.data, pd.DataFrame([new_row])],
                 ignore_index=True
             ).tail(window)
 
             df = st.session_state.data
-            latest = df.iloc[-1]
 
-            # -------- ML ANOMALY --------
-            mean = df["co2"].rolling(5).mean()
-            std = df["co2"].rolling(5).std()
-            anomalies = df[df["co2"] > (mean + 2*std)]
+            # -------- LOGGING --------
+            log_entry = f"{now.strftime('%H:%M:%S')} | Mode={mode} | CO2={co2}"
+            st.session_state.logs.insert(0, log_entry)
+            st.session_state.logs = st.session_state.logs[:10]
+
+            # -------- STATUS --------
+            if co2 > 80:
+                status = "🔴 CRITICAL"
+            elif co2 > 50:
+                status = "🟡 WARNING"
+            else:
+                status = "🟢 STABLE"
+
+            status_box.markdown(f"### System Status: {status}")
+
+            # -------- ANOMALY --------
+            rolling_mean = df["co2"].rolling(5).mean()
+            rolling_std = df["co2"].rolling(5).std()
+            anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
 
             # -------- PREDICTION --------
-            future_x = np.arange(df["time"].iloc[-1], df["time"].iloc[-1]+10)
-            future_y = np.linspace(latest["co2"], latest["co2"]-10, 10)
+            future_x = pd.date_range(start=now, periods=10, freq="S")
+            future_y = np.linspace(co2, co2-10, 10)
 
             # -------- GRAPH --------
             fig = go.Figure()
 
-            fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
-            fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
-            fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["co2"],
+                name="CO2", line=dict(color="red", width=3)
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["queries"],
+                name="Queries"
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["power"],
+                name="Power"
+            ))
 
             fig.add_trace(go.Scatter(
                 x=anomalies["time"],
@@ -177,7 +217,13 @@ with tab1:
                 name="Prediction"
             ))
 
+            fig.update_layout(height=420)
+
             chart.plotly_chart(fig, use_container_width=True)
+
+            # -------- LOG PANEL --------
+            log_box.markdown("### 📜 Event Log")
+            log_box.write(st.session_state.logs)
 
             time.sleep(1)
 
@@ -295,15 +341,76 @@ with tab3:
 # ================= AI =================
 with tab4:
 
-    latest = st.session_state.data.iloc[-1]
+    st.subheader("🧠 AI Decision Engine")
 
-    if latest["co2"] > 70:
-        st.error("🚨 High emissions detected. Reduce workload.")
-    elif latest["co2"] > 40:
-        st.warning("⚠️ Moderate emissions. Optimize usage.")
+    df = st.session_state.data
+    latest = df.iloc[-1]
+
+    co2 = latest["co2"]
+    queries = latest["queries"]
+    power = latest["power"]
+
+    # -------- HEALTH CLASSIFICATION --------
+    if co2 > 80:
+        st.error("🚨 Critical System State")
+        risk = "HIGH"
+    elif co2 > 50:
+        st.warning("⚠️ Moderate Risk")
+        risk = "MEDIUM"
     else:
-        st.success("✅ System efficient.")
+        st.success("✅ Healthy System")
+        risk = "LOW"
 
+    # -------- TREND DETECTION --------
+    trend = df["co2"].tail(5).mean() - df["co2"].head(5).mean()
+
+    if trend > 10:
+        st.warning("📈 CO2 Increasing Trend Detected")
+    elif trend < -10:
+        st.success("📉 CO2 Decreasing Trend")
+    else:
+        st.info("➡️ Stable Trend")
+
+    # -------- PREDICTION --------
+    predicted = co2 - 10
+
+    st.markdown(f"### 🔮 Predicted CO2 (Next Cycle): {int(predicted)}")
+
+    # -------- AI RECOMMENDATIONS --------
+    st.markdown("### 🤖 AI Recommendations")
+
+    if risk == "HIGH":
+        st.write("- Shift workloads to off-peak hours")
+        st.write("- Enable model compression")
+        st.write("- Reduce query load immediately")
+
+    elif risk == "MEDIUM":
+        st.write("- Optimize batching")
+        st.write("- Monitor energy usage closely")
+
+    else:
+        st.write("- Maintain current configuration")
+        st.write("- Continue monitoring")
+
+    # -------- SCENARIO SIMULATION --------
+    st.markdown("### 🧪 Scenario Simulation")
+
+    scenario = st.selectbox("Choose Scenario", ["Peak Load","Optimized","Balanced"])
+
+    if scenario == "Peak Load":
+        st.error("Expected: High CO2 spike and system stress")
+
+    elif scenario == "Optimized":
+        st.success("Expected: Reduced emissions and stable system")
+
+    else:
+        st.info("Expected: Balanced performance")
+
+    # -------- USER QUERY --------
+    query = st.text_area("Ask AI")
+
+    if st.button("Run AI Analysis"):
+        st.info(f"{model} suggests adaptive scaling and load balancing.")
 # ---------------- EXPORT ----------------
 csv = st.session_state.data.to_csv(index=False).encode()
 st.download_button("📁 Download CSV", csv, "data.csv")
