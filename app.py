@@ -1,36 +1,21 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from io import BytesIO
+import time
+import plotly.express as px
+import plotly.graph_objects as go
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="AI Sustainability Dashboard", layout="wide")
 
-# ---------------- THEME ----------------
-dark_mode = st.sidebar.toggle("🌙 Dark Mode", value=False)
-bg = "#0f172a" if dark_mode else "#f5f7fa"
-card_bg = "#111827" if dark_mode else "white"
-text_color = "white" if dark_mode else "black"
-accent = "#22c55e"
-
-st.markdown(f"""
-<style>
-.main {{background-color: {bg}; color: {text_color};}}
-.card {{background: {card_bg}; padding:18px; border-radius:18px; box-shadow:0 8px 24px rgba(0,0,0,0.12);}}
-.section-title {{font-size:18px; font-weight:600; margin-bottom:10px;}}
-.metric {{font-size:26px; font-weight:700;}}
-.sub {{color:gray; font-size:13px;}}
-.badge {{background:{accent}; color:white; padding:4px 10px; border-radius:999px; font-size:12px;}}
-</style>
-""", unsafe_allow_html=True)
-
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("⚙️ Controls")
 model = st.sidebar.selectbox("Select Model", ["Sonar","GPT-5.4","Gemini 3.1 Pro","Claude Sonnet 4.6","Claude Opus 4.6","Nemotron 3 Super"])
-range_filter = st.sidebar.slider("Time Window", 10, 60, 30)
-notif = st.sidebar.checkbox("🔔 Enable Alerts", value=True)
+window = st.sidebar.slider("Time Window", 10, 100, 30)
+live_toggle = st.sidebar.toggle("⚡ Live Monitoring", value=True)
+threshold = st.sidebar.slider("CO2 Threshold", 10, 100, 50)
 
-# ---------------- DATA ----------------
+# ---------------- DATA INIT ----------------
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame({
         "time": list(range(10)),
@@ -39,86 +24,99 @@ if "data" not in st.session_state:
         "power": np.random.randint(200,400,10)
     })
 
-new = {
-    "time": st.session_state.data["time"].iloc[-1] + 1,
-    "queries": np.random.randint(20,120),
-    "co2": np.random.randint(10,60),
-    "power": np.random.randint(200,400)
-}
-st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame([new])], ignore_index=True)
-st.session_state.data = st.session_state.data.tail(range_filter)
+# ---------------- STREAM FUNCTION ----------------
+def websocket_stream():
+    return {
+        "time": st.session_state.data["time"].iloc[-1] + 1,
+        "queries": np.random.randint(20,120),
+        "co2": np.random.randint(10,60),
+        "power": np.random.randint(200,400)
+    }
+
+# ---------------- LIVE UPDATE ----------------
+if live_toggle:
+    new = websocket_stream()
+    st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame([new])], ignore_index=True)
+    st.session_state.data = st.session_state.data.tail(window)
 
 latest = st.session_state.data.iloc[-1]
 
 # ---------------- HEADER ----------------
-col1,col2,col3,col4,col5 = st.columns([1.2,2,2,2,1.5])
-with col1: st.markdown("### SS")
-with col2: st.metric("Queries", int(latest["queries"]))
-with col3: st.metric("CO2", f"{int(latest['co2'])} kg")
-with col4: st.metric("Power", f"{int(latest['power'])} kWh")
-with col5: st.markdown(f"<div class='badge'>{model}</div>", unsafe_allow_html=True)
+c1,c2,c3,c4 = st.columns(4)
+c1.metric("Queries", int(latest["queries"]))
+c2.metric("CO2", f"{int(latest['co2'])} kg")
+c3.metric("Power", f"{int(latest['power'])} kWh")
+c4.metric("Model", model)
 
-# ---------------- ALERTS ----------------
-if notif and latest["co2"] > 50:
-    st.warning("⚠️ High CO2 detected! Consider reducing load.")
+# ---------------- ALERT ----------------
+if latest["co2"] > threshold:
+    st.error("🚨 High CO2 Emission Detected!")
+
+# ---------------- EXTRA CONTROLS ----------------
+st.markdown("### 🎛️ Simulation Controls")
+cA,cB,cC = st.columns(3)
+with cA:
+    if st.button("⚠️ Simulate Spike"):
+        st.session_state.data.loc[st.session_state.data.index[-1],"co2"] = 95
+with cB:
+    if st.button("📉 Drop Load"):
+        st.session_state.data.loc[st.session_state.data.index[-1],"queries"] = 20
+with cC:
+    if st.button("🔄 Reset"):
+        st.session_state.data = st.session_state.data.iloc[:10]
 
 # ---------------- TABS ----------------
-tab1, tab2, tab3 = st.tabs(["📊 Analytics","🧠 AI Insights","📁 Data"])
+tab1, tab2, tab3, tab4 = st.tabs(["📊 Analytics","📈 Advanced","🧠 AI","📁 Data"])
 
-# -------- TAB 1: ANALYTICS --------
+# -------- TAB 1 --------
 with tab1:
-    left,right = st.columns([2,1])
+    df = st.session_state.data
 
-    with left:
-        st.markdown("<div class='section-title'>Usage Timeline</div>", unsafe_allow_html=True)
-        st.line_chart(st.session_state.data.set_index("time")["queries"])
+    fig1 = px.line(df, x="time", y="queries", title="Live Queries", markers=True)
+    st.plotly_chart(fig1, use_container_width=True)
 
-        st.markdown("<div class='section-title'>Trend Comparison</div>", unsafe_allow_html=True)
-        st.line_chart(st.session_state.data.set_index("time")[["queries","co2"]])
+    fig2 = px.line(df, x="time", y=["queries","co2"], title="CO2 vs Queries")
+    st.plotly_chart(fig2, use_container_width=True)
 
-        st.markdown("<div class='section-title'>Power Consumption</div>", unsafe_allow_html=True)
-        st.area_chart(st.session_state.data.set_index("time")["power"])
+    fig3 = px.area(df, x="time", y="power", title="Power Consumption")
+    st.plotly_chart(fig3, use_container_width=True)
 
-        st.markdown("<div class='section-title'>CO2 Prediction</div>", unsafe_allow_html=True)
-        future = np.arange(range_filter, range_filter+10)
-        pred = np.linspace(latest['co2'], latest['co2']-10, 10)
-        st.line_chart(pd.DataFrame({"time":future,"pred":pred}).set_index("time"))
-
-    with right:
-        st.markdown("<div class='card'>", unsafe_allow_html=True)
-        st.markdown("<div class='section-title'>Session Stats</div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='metric'>{len(st.session_state.data)}</div>", unsafe_allow_html=True)
-        st.markdown("<div class='sub'>Active Sessions</div>", unsafe_allow_html=True)
-        st.write("---")
-        st.markdown("<div class='section-title'>Model Usage</div>", unsafe_allow_html=True)
-        m = pd.DataFrame({"model":["Sonar","GPT","Gemini","Claude"],"usage":np.random.randint(10,60,4)})
-        st.bar_chart(m.set_index("model"))
-        st.markdown("</div>", unsafe_allow_html=True)
-
-# -------- TAB 2: AI INSIGHTS --------
+# -------- TAB 2 (ADVANCED VISUALS) --------
 with tab2:
-    st.markdown("### 🤖 Smart Insights")
-    st.success(f"{model}: Optimize batching + shift workloads to off-peak.")
+    st.subheader("3D Visualization")
+    fig4 = px.scatter_3d(df, x="time", y="queries", z="co2", color="power")
+    st.plotly_chart(fig4, use_container_width=True)
 
-    st.markdown("### 🧠 Inference")
-    txt = st.text_area("Enter query")
-    if st.button("Run Model"):
-        st.info(f"{model} → Reduce redundant calls & compress workloads.")
+    st.subheader("Heatmap")
+    heat = np.random.rand(10,10)
+    fig5 = go.Figure(data=go.Heatmap(z=heat))
+    st.plotly_chart(fig5, use_container_width=True)
 
-# -------- TAB 3: DATA --------
+# -------- TAB 3 --------
 with tab3:
-    st.markdown("### 📁 Raw Data")
-    st.dataframe(st.session_state.data)
+    st.subheader("AI Insights")
+    st.success(f"{model}: Optimize batching, reduce redundant queries, shift workloads.")
 
+    scenario = st.selectbox("Scenario", ["Peak","Normal","Optimized"])
+    if scenario == "Peak": st.warning("High emissions expected")
+    elif scenario == "Optimized": st.success("Efficient system")
+
+    query = st.text_area("Enter query")
+    if st.button("Run Model"):
+        st.info(f"{model} suggests caching + batching.")
+
+# -------- TAB 4 --------
+with tab4:
+    st.dataframe(st.session_state.data, use_container_width=True)
     csv = st.session_state.data.to_csv(index=False).encode()
-    st.download_button("⬇️ Export CSV", csv, "data.csv")
+    st.download_button("Download CSV", csv, "data.csv")
 
-    st.markdown("### 📄 Generate Report")
-    report = f"Model: {model}\nQueries: {int(latest['queries'])}\nCO2: {int(latest['co2'])}\nPower: {int(latest['power'])}"
-    st.download_button("Download Report", report, "report.txt")
+# ---------------- LOOP ----------------
+if live_toggle:
+    time.sleep(1)
+    st.rerun()
 
 # ---------------- FOOTER ----------------
 st.write("\n\n")
 
-# Run:
-# streamlit run filename.py
+# Run: streamlit run filename.py
