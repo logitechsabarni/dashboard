@@ -105,22 +105,25 @@ with tab1:
     chart = st.empty()
     status_box = st.empty()
 
-    # -------- INIT TIME INDEX --------
+    # -------- INIT --------
     if "last_time" not in st.session_state:
         st.session_state.last_time = pd.Timestamp.now()
 
+    if "last_update" not in st.session_state:
+        st.session_state.last_update = time.time()
+
+    # -------- REAL-TIME UPDATE --------
     if st.session_state.running:
 
-        for _ in range(500):
+        if time.time() - st.session_state.last_update > 1:
 
-            # -------- TIME UPDATE --------
             now = st.session_state.last_time + pd.Timedelta(seconds=1)
             st.session_state.last_time = now
 
             mode = st.session_state.mode
             factor = intensity
 
-            # -------- DATA GENERATION (SMOOTHER + REALISTIC) --------
+            # -------- DATA GENERATION --------
             base_q = np.random.randint(40, 80)
 
             if mode == "spike":
@@ -150,84 +153,16 @@ with tab1:
                 ignore_index=True
             ).tail(window)
 
-            df = st.session_state.data.copy()
+            st.session_state.last_update = time.time()
 
-            # -------- STATUS (STABLE) --------
-            avg_co2 = df["co2"].tail(5).mean()
+            st.rerun()   # 🔥 KEY FOR REAL-TIME
 
-            if avg_co2 > 85:
-                status = "🔴 CRITICAL"
-            elif avg_co2 > 65:
-                status = "🟠 HIGH"
-            elif avg_co2 > 45:
-                status = "🟡 MEDIUM"
-            else:
-                status = "🟢 LOW"
-
-            status_box.markdown(f"### System Status: {status}")
-
-            # -------- ANOMALY --------
-            rolling_mean = df["co2"].rolling(5).mean().fillna(0)
-            rolling_std = df["co2"].rolling(5).std().fillna(0)
-
-            anomalies = df[df["co2"] > (rolling_mean + 2 * rolling_std)]
-
-            # -------- GRAPH --------
-            fig = go.Figure()
-
-            fig.add_trace(go.Scatter(
-                x=df["time"], y=df["co2"],
-                name="CO2",
-                line=dict(color="red", width=3)
-            ))
-
-            fig.add_trace(go.Scatter(
-                x=df["time"], y=df["queries"],
-                name="Queries",
-                line=dict(color="blue")
-            ))
-
-            fig.add_trace(go.Scatter(
-                x=df["time"], y=df["power"],
-                name="Power",
-                line=dict(color="green")
-            ))
-
-            # -------- ZONES --------
-            fig.add_hrect(y0=0, y1=40, fillcolor="green", opacity=0.08)
-            fig.add_hrect(y0=40, y1=60, fillcolor="yellow", opacity=0.08)
-            fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
-            fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
-
-            # -------- ANOMALY POINTS --------
-            if not anomalies.empty:
-                fig.add_trace(go.Scatter(
-                    x=anomalies["time"],
-                    y=anomalies["co2"],
-                    mode="markers",
-                    marker=dict(color="red", size=10),
-                    name="Anomaly"
-                ))
-
-            fig.update_layout(
-                height=420,
-                title=f"Live Monitoring | Status: {status}",
-                margin=dict(l=10, r=10, t=40, b=10)
-            )
-
-            # ✅ SMOOTH UPDATE (NO FLICKER)
-            chart.plotly_chart(fig, use_container_width=True)
-
-            time.sleep(0.8)
-
-            if not st.session_state.running:
-                break
-
-    # -------- SHOW LAST GRAPH AFTER STOP --------
+    # -------- DATA --------
     df = st.session_state.data.copy()
 
     if not df.empty:
 
+        # -------- STATUS --------
         avg_co2 = df["co2"].tail(5).mean()
 
         if avg_co2 > 85:
@@ -241,16 +176,54 @@ with tab1:
 
         status_box.markdown(f"### System Status: {status}")
 
+        # -------- ANOMALY --------
+        rolling_mean = df["co2"].rolling(5).mean().fillna(0)
+        rolling_std = df["co2"].rolling(5).std().fillna(0)
+
+        anomalies = df[df["co2"] > (rolling_mean + 2 * rolling_std)]
+
+        # -------- GRAPH --------
         fig = go.Figure()
 
-        fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
-        fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
-        fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
+        fig.add_trace(go.Scatter(
+            x=df["time"], y=df["co2"],
+            name="CO2",
+            line=dict(color="red", width=3)
+        ))
 
+        fig.add_trace(go.Scatter(
+            x=df["time"], y=df["queries"],
+            name="Queries",
+            line=dict(color="blue")
+        ))
+
+        fig.add_trace(go.Scatter(
+            x=df["time"], y=df["power"],
+            name="Power",
+            line=dict(color="green")
+        ))
+
+        # -------- ZONES --------
         fig.add_hrect(y0=0, y1=40, fillcolor="green", opacity=0.08)
         fig.add_hrect(y0=40, y1=60, fillcolor="yellow", opacity=0.08)
         fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
         fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
+
+        # -------- ANOMALIES --------
+        if not anomalies.empty:
+            fig.add_trace(go.Scatter(
+                x=anomalies["time"],
+                y=anomalies["co2"],
+                mode="markers",
+                marker=dict(color="red", size=10),
+                name="Anomaly"
+            ))
+
+        fig.update_layout(
+            height=420,
+            title=f"Live Monitoring | Status: {status}",
+            margin=dict(l=10, r=10, t=40, b=10)
+        )
 
         chart.plotly_chart(fig, use_container_width=True)
 # ================= ANALYTICS =================
