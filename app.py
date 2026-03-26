@@ -1,122 +1,206 @@
+# ================= STREAMLIT FRONTEND ONLY (ADVANCED, INTERACTIVE, ~250 LINES) =================
+# Run: streamlit run app.py
+
 import streamlit as st
 import pandas as pd
 import numpy as np
 import time
-import plotly.express as px
 import plotly.graph_objects as go
+import plotly.express as px
 
 # ---------------- CONFIG ----------------
 st.set_page_config(page_title="AI Sustainability Dashboard", layout="wide")
 
 # ---------------- SIDEBAR ----------------
 st.sidebar.title("⚙️ Controls")
-model = st.sidebar.selectbox("Select Model", ["Sonar","GPT-5.4","Gemini 3.1 Pro","Claude Sonnet 4.6","Claude Opus 4.6","Nemotron 3 Super"])
-window = st.sidebar.slider("Time Window", 10, 100, 30)
-live_toggle = st.sidebar.toggle("⚡ Live Monitoring", value=True)
-threshold = st.sidebar.slider("CO2 Threshold", 10, 100, 50)
+model = st.sidebar.selectbox("Select Model", [
+    "Sonar","GPT-5.4","Gemini 3.1 Pro",
+    "Claude Sonnet 4.6","Claude Opus 4.6","Nemotron 3 Super"
+])
+window = st.sidebar.slider("Time Window", 20, 100, 40)
+threshold_safe = st.sidebar.slider("Safe Limit", 10, 60, 40)
+threshold_warn = st.sidebar.slider("Warning Limit", 40, 100, 70)
 
-# ---------------- DATA INIT ----------------
+# ---------------- STATE ----------------
+if "running" not in st.session_state:
+    st.session_state.running = False
+
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame({
-        "time": list(range(10)),
-        "queries": np.random.randint(20,120,10),
-        "co2": np.random.randint(10,60,10),
-        "power": np.random.randint(200,400,10)
+        "time": list(range(20)),
+        "queries": np.random.randint(20,120,20),
+        "co2": np.random.randint(10,60,20),
+        "power": np.random.randint(200,400,20)
     })
 
-# ---------------- STREAM FUNCTION ----------------
-def websocket_stream():
-    return {
-        "time": st.session_state.data["time"].iloc[-1] + 1,
-        "queries": np.random.randint(20,120),
-        "co2": np.random.randint(10,60),
-        "power": np.random.randint(200,400)
-    }
+# ---------------- HEADER ----------------
+st.title("⚡ AI Sustainability Monitoring Dashboard")
 
-# ---------------- LIVE UPDATE ----------------
-if live_toggle:
-    new = websocket_stream()
-    st.session_state.data = pd.concat([st.session_state.data, pd.DataFrame([new])], ignore_index=True)
-    st.session_state.data = st.session_state.data.tail(window)
-
+c1,c2,c3,c4 = st.columns(4)
 latest = st.session_state.data.iloc[-1]
 
-# ---------------- HEADER ----------------
-c1,c2,c3,c4 = st.columns(4)
 c1.metric("Queries", int(latest["queries"]))
 c2.metric("CO2", f"{int(latest['co2'])} kg")
 c3.metric("Power", f"{int(latest['power'])} kWh")
 c4.metric("Model", model)
 
-# ---------------- ALERT ----------------
-if latest["co2"] > threshold:
-    st.error("🚨 High CO2 Emission Detected!")
+# ---------------- CONTROL PANEL ----------------
+st.markdown("### 🎛️ Control Panel")
+colA,colB,colC = st.columns(3)
+
+with colA:
+    if st.button("▶️ Start Monitoring"):
+        st.session_state.running = True
+
+with colB:
+    if st.button("⏸ Stop Monitoring"):
+        st.session_state.running = False
+
+with colC:
+    if st.button("🔄 Reset Data"):
+        st.session_state.data = st.session_state.data.iloc[:20]
 
 # ---------------- EXTRA CONTROLS ----------------
-st.markdown("### 🎛️ Simulation Controls")
-cA,cB,cC = st.columns(3)
-with cA:
-    if st.button("⚠️ Simulate Spike"):
+colD,colE,colF = st.columns(3)
+
+with colD:
+    if st.button("⚠️ Simulate CO2 Spike"):
         st.session_state.data.loc[st.session_state.data.index[-1],"co2"] = 95
-with cB:
-    if st.button("📉 Drop Load"):
+
+with colE:
+    if st.button("📉 Reduce Load"):
         st.session_state.data.loc[st.session_state.data.index[-1],"queries"] = 20
-with cC:
-    if st.button("🔄 Reset"):
-        st.session_state.data = st.session_state.data.iloc[:10]
+
+with colF:
+    if st.button("⚡ Boost Traffic"):
+        st.session_state.data.loc[st.session_state.data.index[-1],"queries"] = 150
 
 # ---------------- TABS ----------------
-tab1, tab2, tab3, tab4 = st.tabs(["📊 Analytics","📈 Advanced","🧠 AI","📁 Data"])
+tab1, tab2, tab3, tab4 = st.tabs([
+    "⚡ Real-Time","📊 Analytics","📈 Advanced","🧠 AI"
+])
 
-# -------- TAB 1 --------
+# ================= REAL-TIME TAB =================
 with tab1:
+    st.subheader("Live Monitoring System")
+
+    chart = st.empty()
+    alert = st.empty()
+
+    if st.session_state.running:
+        for i in range(200):
+            new = {
+                "time": st.session_state.data["time"].iloc[-1] + 1,
+                "queries": np.random.randint(20,120),
+                "co2": np.random.randint(10,100),
+                "power": np.random.randint(200,400)
+            }
+
+            st.session_state.data = pd.concat([
+                st.session_state.data,
+                pd.DataFrame([new])
+            ], ignore_index=True).tail(window)
+
+            df = st.session_state.data
+            latest = df.iloc[-1]
+
+            # -------- ALERT LOGIC --------
+            if latest["co2"] > threshold_warn:
+                alert.error("🚨 HIGH CO2 LEVEL")
+            elif latest["co2"] > threshold_safe:
+                alert.warning("⚠️ Moderate CO2")
+            else:
+                alert.success("✅ System Stable")
+
+            # -------- GRAPH --------
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["co2"],
+                name="CO2", mode="lines",
+                line=dict(color="red", width=3)
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["queries"],
+                name="Queries", mode="lines",
+                line=dict(color="blue")
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=df["time"], y=df["power"],
+                name="Power", mode="lines",
+                line=dict(color="green")
+            ))
+
+            # colored zones
+            fig.add_hrect(y0=0, y1=threshold_safe, fillcolor="green", opacity=0.1)
+            fig.add_hrect(y0=threshold_safe, y1=threshold_warn, fillcolor="yellow", opacity=0.1)
+            fig.add_hrect(y0=threshold_warn, y1=120, fillcolor="red", opacity=0.1)
+
+            fig.update_layout(title="Real-Time Monitoring", height=400)
+
+            chart.plotly_chart(fig, use_container_width=True)
+
+            time.sleep(1)
+
+            if not st.session_state.running:
+                break
+
+# ================= ANALYTICS =================
+with tab2:
     df = st.session_state.data
 
-    fig1 = px.line(df, x="time", y="queries", title="Live Queries", markers=True)
-    st.plotly_chart(fig1, use_container_width=True)
+    st.subheader("Historical Trends")
+    st.line_chart(df.set_index("time")[["queries","co2"]])
 
-    fig2 = px.line(df, x="time", y=["queries","co2"], title="CO2 vs Queries")
-    st.plotly_chart(fig2, use_container_width=True)
+    st.subheader("Power Usage")
+    st.area_chart(df.set_index("time")["power"])
 
-    fig3 = px.area(df, x="time", y="power", title="Power Consumption")
-    st.plotly_chart(fig3, use_container_width=True)
+    st.subheader("Model Distribution")
+    dist = pd.DataFrame({
+        "model":["Sonar","GPT","Gemini","Claude"],
+        "usage": np.random.randint(10,60,4)
+    })
+    st.bar_chart(dist.set_index("model"))
 
-# -------- TAB 2 (ADVANCED VISUALS) --------
-with tab2:
-    st.subheader("3D Visualization")
-    fig4 = px.scatter_3d(df, x="time", y="queries", z="co2", color="power")
-    st.plotly_chart(fig4, use_container_width=True)
+# ================= ADVANCED =================
+with tab3:
+    df = st.session_state.data
+
+    st.subheader("3D Analysis")
+    fig3d = px.scatter_3d(df, x="time", y="queries", z="co2", color="power")
+    st.plotly_chart(fig3d, use_container_width=True)
 
     st.subheader("Heatmap")
     heat = np.random.rand(10,10)
-    fig5 = go.Figure(data=go.Heatmap(z=heat))
-    st.plotly_chart(fig5, use_container_width=True)
+    fig_heat = go.Figure(data=go.Heatmap(z=heat))
+    st.plotly_chart(fig_heat, use_container_width=True)
 
-# -------- TAB 3 --------
-with tab3:
+# ================= AI =================
+with tab4:
     st.subheader("AI Insights")
-    st.success(f"{model}: Optimize batching, reduce redundant queries, shift workloads.")
+
+    st.success(f"{model}: Reduce peak loads and optimize scheduling.")
 
     scenario = st.selectbox("Scenario", ["Peak","Normal","Optimized"])
-    if scenario == "Peak": st.warning("High emissions expected")
-    elif scenario == "Optimized": st.success("Efficient system")
+
+    if scenario == "Peak":
+        st.error("⚠️ High emissions expected")
+    elif scenario == "Optimized":
+        st.success("✅ Efficient system")
 
     query = st.text_area("Enter query")
+
     if st.button("Run Model"):
-        st.info(f"{model} suggests caching + batching.")
+        st.info(f"{model} suggests batching and caching.")
 
-# -------- TAB 4 --------
-with tab4:
-    st.dataframe(st.session_state.data, use_container_width=True)
-    csv = st.session_state.data.to_csv(index=False).encode()
-    st.download_button("Download CSV", csv, "data.csv")
-
-# ---------------- LOOP ----------------
-if live_toggle:
-    time.sleep(1)
-    st.rerun()
+# ---------------- DATA EXPORT ----------------
+st.markdown("### 📁 Data Export")
+csv = st.session_state.data.to_csv(index=False).encode()
+st.download_button("Download CSV", csv, "data.csv")
 
 # ---------------- FOOTER ----------------
 st.write("\n\n")
 
-# Run: streamlit run filename.py
+# ================= END =================
