@@ -149,23 +149,19 @@ with tab1:
             df = st.session_state.data.copy()
             latest = df.iloc[-1]
 
-            # -------- STATUS CLASSIFICATION --------
+            # -------- STATUS --------
             if latest["co2"] > 80:
                 status = "🔴 CRITICAL"
-                color = "red"
             elif latest["co2"] > 60:
                 status = "🟠 HIGH"
-                color = "orange"
             elif latest["co2"] > 40:
                 status = "🟡 MEDIUM"
-                color = "yellow"
             else:
                 status = "🟢 LOW"
-                color = "green"
 
             status_box.markdown(f"### System Status: {status}")
 
-            # -------- SAFE ANOMALY --------
+            # -------- ANOMALY --------
             rolling_mean = df["co2"].rolling(5).mean().fillna(0)
             rolling_std = df["co2"].rolling(5).std().fillna(0)
 
@@ -174,21 +170,18 @@ with tab1:
             # -------- GRAPH --------
             fig = go.Figure()
 
-            # CO2 line
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["co2"],
                 name="CO2",
                 line=dict(color="red", width=3)
             ))
 
-            # Queries
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["queries"],
                 name="Queries",
                 line=dict(color="blue")
             ))
 
-            # Power
             fig.add_trace(go.Scatter(
                 x=df["time"], y=df["power"],
                 name="Power",
@@ -201,28 +194,32 @@ with tab1:
             fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
             fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
 
-            # -------- ANOMALY --------
-            fig.add_trace(go.Scatter(
-                x=anomalies["time"],
-                y=anomalies["co2"],
-                mode="markers",
-                marker=dict(color="red", size=10),
-                name="Anomaly"
-            ))
+            # -------- ANOMALY POINTS --------
+            if not anomalies.empty:
+                fig.add_trace(go.Scatter(
+                    x=anomalies["time"],
+                    y=anomalies["co2"],
+                    mode="markers",
+                    marker=dict(color="red", size=10),
+                    name="Anomaly"
+                ))
 
             fig.update_layout(
                 height=420,
-                title=f"Live Monitoring | Status: {status}"
+                title=f"Live Monitoring | Status: {status}",
+                margin=dict(l=10, r=10, t=40, b=10)
             )
 
-            chart.plotly_chart(fig, use_container_width=True)
+            # ✅ FIX: FORCE RENDER
+            chart.empty()
+            chart.plotly_chart(fig, use_container_width=True, key=str(time.time()))
 
             time.sleep(1)
 
             if not st.session_state.running:
                 break
 
-    # -------- KEEP LAST GRAPH AFTER STOP --------
+    # -------- SHOW LAST GRAPH AFTER STOP --------
     df = st.session_state.data.copy()
 
     if not df.empty:
@@ -236,17 +233,6 @@ with tab1:
         fig.add_hrect(y0=40, y1=60, fillcolor="yellow", opacity=0.08)
         fig.add_hrect(y0=60, y1=80, fillcolor="orange", opacity=0.08)
         fig.add_hrect(y0=80, y1=120, fillcolor="red", opacity=0.08)
-
-        chart.plotly_chart(fig, use_container_width=True)
-
-    # ✅ KEEP LAST GRAPH AFTER STOP
-    df = st.session_state.data.copy()
-
-    if not df.empty:
-        fig = go.Figure()
-        fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
-        fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
-        fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
 
         chart.plotly_chart(fig, use_container_width=True)
 # ================= ANALYTICS =================
