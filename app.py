@@ -1,4 +1,4 @@
-# ================= ELITE FINAL DASHBOARD =================
+# ================= FINAL FIXED DASHBOARD =================
 # streamlit run app.py
 
 import streamlit as st
@@ -6,41 +6,19 @@ import pandas as pd
 import numpy as np
 import time
 import plotly.graph_objects as go
+import plotly.express as px
 
-# ---------------- PAGE CONFIG ----------------
-st.set_page_config(
-    page_title="AI Sustainability System",
-    layout="wide",
-    initial_sidebar_state="expanded"
-)
-
-# ---------------- CUSTOM DARK UI ----------------
-st.markdown("""
-<style>
-body {
-    background-color: #0e1117;
-}
-.metric-card {
-    background: #1c1f26;
-    padding: 15px;
-    border-radius: 12px;
-}
-.big-title {
-    font-size: 30px;
-    font-weight: 700;
-}
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="AI Sustainability Dashboard", layout="wide")
 
 # ---------------- SIDEBAR ----------------
-st.sidebar.title("⚙️ System Controls")
+st.sidebar.title("⚙️ Controls")
 
-model = st.sidebar.selectbox("AI Model", [
+model = st.sidebar.selectbox("Model", [
     "Sonar","GPT-5.4","Gemini 3.1 Pro",
     "Claude Sonnet 4.6","Claude Opus 4.6","Nemotron 3 Super"
 ])
 
-window = st.sidebar.slider("Time Window", 20, 100, 50)
+window = st.sidebar.slider("Time Window", 20, 100, 40)
 intensity = st.sidebar.slider("⚡ Intensity", 1, 5, 3)
 
 # ---------------- STATE ----------------
@@ -53,33 +31,30 @@ if "mode" not in st.session_state:
 if "data" not in st.session_state:
     st.session_state.data = pd.DataFrame({
         "time": list(range(20)),
-        "queries": np.random.randint(40,100,20),
+        "queries": np.random.randint(50,100,20),
         "co2": np.random.randint(20,50,20),
-        "power": np.random.randint(200,350,20)
+        "power": np.random.randint(250,350,20)
     })
+
+# ---------------- HEADER ----------------
+st.title("⚡ AI Sustainability Monitoring System")
 
 df = st.session_state.data
 latest = df.iloc[-1]
 
-# ---------------- HEADER ----------------
-st.markdown('<div class="big-title">⚡ AI Sustainability Monitoring System</div>', unsafe_allow_html=True)
-
-# ---------------- METRICS ----------------
+# -------- METRICS --------
 c1,c2,c3,c4 = st.columns(4)
-
 c1.metric("Queries", int(latest["queries"]))
 c2.metric("CO2 (kg)", int(latest["co2"]))
 c3.metric("Power (kWh)", int(latest["power"]))
 c4.metric("Mode", st.session_state.mode.upper())
 
-# ---------------- CARBON COST ----------------
+# -------- CARBON COST --------
 carbon_cost = latest["co2"] * 0.02
-
-st.markdown("### 💰 Carbon Impact")
-st.metric("Estimated Cost ($)", f"{carbon_cost:.2f}")
+st.metric("💰 Carbon Cost ($)", f"{carbon_cost:.2f}")
 
 # ---------------- CONTROLS ----------------
-st.markdown("### 🎛️ Control Panel")
+st.markdown("### 🎛️ Controls")
 
 col1,col2,col3 = st.columns(3)
 
@@ -102,137 +77,233 @@ st.markdown("### ⚡ System Behavior")
 b1,b2,b3,b4 = st.columns(4)
 
 with b1:
-    if st.button("⚠️ Spike Mode"):
+    if st.button("⚠️ Spike"):
         st.session_state.mode = "spike"
 
 with b2:
-    if st.button("📉 Reduce Load"):
+    if st.button("📉 Reduce"):
         st.session_state.mode = "low"
 
 with b3:
-    if st.button("🚀 Boost Traffic"):
+    if st.button("🚀 Boost"):
         st.session_state.mode = "high"
 
 with b4:
-    if st.button("✅ Normalize"):
+    if st.button("✅ Normal"):
         st.session_state.mode = "normal"
 
-# ---------------- REAL-TIME ----------------
-st.markdown("## ⚡ Real-Time Monitoring")
+# ---------------- TABS ----------------
+tab1, tab2, tab3, tab4 = st.tabs([
+    "⚡ Real-Time","📊 Analytics","📈 Advanced","🧠 AI Insights"
+])
 
-chart = st.empty()
-insight_box = st.empty()
+# ================= REAL-TIME =================
+with tab1:
 
-if st.session_state.running:
+    chart = st.empty()
 
-    for _ in range(500):
+    if st.session_state.running:
 
-        mode = st.session_state.mode
-        factor = intensity
+        for _ in range(500):
 
-        # -------- MODE LOGIC --------
-        if mode == "spike":
-            queries = np.random.randint(100,150) * factor
-            co2 = np.random.randint(70,100)
-            power = np.random.randint(350,450)
+            mode = st.session_state.mode
+            factor = intensity
 
-        elif mode == "low":
-            queries = np.random.randint(10,40) // factor
-            co2 = np.random.randint(10,30)
-            power = np.random.randint(150,250)
+            # -------- MODE LOGIC (FIXED) --------
+            if mode == "spike":
+                queries = np.random.randint(120,180) * factor
+                co2 = np.random.randint(80,110)
+                power = np.random.randint(350,450)
 
-        elif mode == "high":
-            queries = np.random.randint(120,180)
-            co2 = np.random.randint(60,90)
-            power = np.random.randint(300,450)
+            elif mode == "low":
+                queries = np.random.randint(10,40) // factor
+                co2 = np.random.randint(10,30)
+                power = np.random.randint(150,250)
 
-        else:
-            queries = np.random.randint(40,100)
-            co2 = np.random.randint(20,60)
-            power = np.random.randint(200,350)
+            elif mode == "high":
+                queries = np.random.randint(150,220)
+                co2 = np.random.randint(60,90)
+                power = np.random.randint(300,450)
 
-        new_row = {
-            "time": df["time"].iloc[-1] + 1,
-            "queries": queries,
-            "co2": co2,
-            "power": power
+            else:
+                queries = np.random.randint(40,100)
+                co2 = np.random.randint(20,60)
+                power = np.random.randint(200,350)
+
+            new_row = {
+                "time": df["time"].iloc[-1] + 1,
+                "queries": queries,
+                "co2": co2,
+                "power": power
+            }
+
+            st.session_state.data = pd.concat(
+                [df, pd.DataFrame([new_row])],
+                ignore_index=True
+            ).tail(window)
+
+            df = st.session_state.data
+            latest = df.iloc[-1]
+
+            # -------- ML ANOMALY --------
+            mean = df["co2"].rolling(5).mean()
+            std = df["co2"].rolling(5).std()
+            anomalies = df[df["co2"] > (mean + 2*std)]
+
+            # -------- PREDICTION --------
+            future_x = np.arange(df["time"].iloc[-1], df["time"].iloc[-1]+10)
+            future_y = np.linspace(latest["co2"], latest["co2"]-10, 10)
+
+            # -------- GRAPH --------
+            fig = go.Figure()
+
+            fig.add_trace(go.Scatter(x=df["time"], y=df["co2"], name="CO2"))
+            fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
+            fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
+
+            fig.add_trace(go.Scatter(
+                x=anomalies["time"],
+                y=anomalies["co2"],
+                mode="markers",
+                marker=dict(color="red", size=10),
+                name="Anomaly"
+            ))
+
+            fig.add_trace(go.Scatter(
+                x=future_x,
+                y=future_y,
+                mode="lines",
+                line=dict(dash="dash"),
+                name="Prediction"
+            ))
+
+            chart.plotly_chart(fig, use_container_width=True)
+
+            time.sleep(1)
+
+            if not st.session_state.running:
+                break
+
+# ================= ANALYTICS =================
+with tab2:
+
+    df = st.session_state.data
+
+    st.subheader("📊 System Analytics")
+
+    # -------- KPI SUMMARY --------
+    c1, c2, c3 = st.columns(3)
+
+    c1.metric("Avg CO2", round(df["co2"].mean(), 2))
+    c2.metric("Peak CO2", int(df["co2"].max()))
+    c3.metric("Avg Power", round(df["power"].mean(), 2))
+
+    # -------- ROLLING TREND --------
+    st.markdown("### 📈 Smoothed Trends")
+
+    rolling = df.set_index("time").rolling(5).mean()
+    st.line_chart(rolling[["co2","queries","power"]])
+
+    # -------- CORRELATION HEATMAP --------
+    st.markdown("### 🔗 Feature Correlation")
+
+    corr = df[["queries","co2","power"]].corr()
+
+    fig = go.Figure(data=go.Heatmap(
+        z=corr.values,
+        x=corr.columns,
+        y=corr.columns,
+        colorscale="RdBu"
+    ))
+
+    st.plotly_chart(fig, use_container_width=True)
+
+    # -------- DISTRIBUTION --------
+    st.markdown("### 📊 Distribution")
+
+    st.bar_chart(df.tail(15)[["queries","co2","power"]])
+
+# ================= ADVANCED =================
+with tab3:
+
+    df = st.session_state.data
+
+    st.subheader("📈 Advanced System Insights")
+
+    # -------- 3D SCATTER --------
+    st.markdown("### 🌐 3D System View")
+
+    fig3d = px.scatter_3d(
+        df,
+        x="time",
+        y="queries",
+        z="co2",
+        color="power",
+        size="queries"
+    )
+
+    st.plotly_chart(fig3d, use_container_width=True)
+
+    # -------- BUBBLE CHART --------
+    st.markdown("### 🔵 Load vs Emissions")
+
+    fig_bubble = px.scatter(
+        df,
+        x="queries",
+        y="co2",
+        size="power",
+        color="power",
+        hover_data=["time"]
+    )
+
+    st.plotly_chart(fig_bubble, use_container_width=True)
+
+    # -------- SYSTEM STRESS GAUGE --------
+    st.markdown("### ⚡ System Stress Indicator")
+
+    stress = min(100, int(df["co2"].iloc[-1]))
+
+    gauge = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=stress,
+        title={"text": "CO2 Stress Level"},
+        gauge={
+            "axis": {"range": [0,100]},
+            "bar": {"color": "red"},
+            "steps": [
+                {"range": [0,40], "color": "green"},
+                {"range": [40,70], "color": "yellow"},
+                {"range": [70,100], "color": "red"},
+            ],
         }
+    ))
 
-        st.session_state.data = pd.concat([
-            df, pd.DataFrame([new_row])
-        ], ignore_index=True).tail(window)
+    st.plotly_chart(gauge, use_container_width=True)
 
-        df = st.session_state.data
-        latest = df.iloc[-1]
+    # -------- ANOMALY DENSITY --------
+    st.markdown("### 🚨 Anomaly Density")
 
-        # -------- ML ANOMALY --------
-        mean = df["co2"].rolling(5).mean()
-        std = df["co2"].rolling(5).std()
+    rolling_mean = df["co2"].rolling(5).mean()
+    rolling_std = df["co2"].rolling(5).std()
 
-        anomalies = df[df["co2"] > (mean + 2*std)]
+    anomalies = df[df["co2"] > (rolling_mean + 2*rolling_std)]
 
-        # -------- AI INSIGHTS --------
-        if latest["co2"] > 70:
-            insight_box.error("🚨 AI: Critical emissions. Shift workload now.")
-        elif latest["co2"] > 40:
-            insight_box.warning("⚠️ AI: Optimize scheduling.")
-        else:
-            insight_box.success("✅ AI: Efficient system.")
+    st.write(f"Total anomalies detected: {len(anomalies)}")
 
-        # -------- PREDICTION --------
-        future_x = np.arange(df["time"].iloc[-1], df["time"].iloc[-1]+10)
-        future_y = np.linspace(latest["co2"], latest["co2"]-10, 10)
+    st.bar_chart(anomalies[["co2"]])
 
-        # -------- GRAPH --------
-        fig = go.Figure()
+# ================= AI =================
+with tab4:
 
-        fig.add_trace(go.Scatter(x=df["time"], y=df["co2"],
-                                 name="CO2", line=dict(color="red", width=3)))
+    latest = st.session_state.data.iloc[-1]
 
-        fig.add_trace(go.Scatter(x=df["time"], y=df["queries"], name="Queries"))
-        fig.add_trace(go.Scatter(x=df["time"], y=df["power"], name="Power"))
-
-        # anomalies
-        fig.add_trace(go.Scatter(
-            x=anomalies["time"],
-            y=anomalies["co2"],
-            mode="markers",
-            marker=dict(color="red", size=10),
-            name="Anomaly"
-        ))
-
-        # prediction
-        fig.add_trace(go.Scatter(
-            x=future_x,
-            y=future_y,
-            mode="lines",
-            line=dict(dash="dash"),
-            name="Prediction"
-        ))
-
-        fig.update_layout(
-            template="plotly_dark",
-            height=450,
-            title=f"Mode: {mode.upper()}"
-        )
-
-        chart.plotly_chart(fig, use_container_width=True)
-
-        time.sleep(1)
-
-        if not st.session_state.running:
-            break
-
-# ---------------- LEADERBOARD ----------------
-st.markdown("## 🏆 Efficiency Leaderboard")
-
-leaderboard = pd.DataFrame({
-    "Model": ["Sonar","GPT","Gemini","Claude"],
-    "Efficiency Score": np.round(100 - np.random.rand(4)*30, 2)
-}).sort_values(by="Efficiency Score", ascending=False)
-
-st.dataframe(leaderboard, use_container_width=True)
+    if latest["co2"] > 70:
+        st.error("🚨 High emissions detected. Reduce workload.")
+    elif latest["co2"] > 40:
+        st.warning("⚠️ Moderate emissions. Optimize usage.")
+    else:
+        st.success("✅ System efficient.")
 
 # ---------------- EXPORT ----------------
 csv = st.session_state.data.to_csv(index=False).encode()
-st.download_button("📁 Download Data", csv, "data.csv")
+st.download_button("📁 Download CSV", csv, "data.csv")
