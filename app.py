@@ -1394,11 +1394,13 @@ with tab7:
                                      name="Avg CO₂", mode="lines+markers",
                                      line=dict(color=THEME["red"], width=2),
                                      marker=dict(size=5), yaxis="y2"))
+        base_layout = _chart_base(300)
+        base_layout.pop("yaxis", None)
         fig_sn.update_layout(
-            **_chart_base(300),
-            yaxis=dict(title="Efficiency", gridcolor=THEME["border"]),
+            **base_layout,
+            yaxis=dict(title="Efficiency", showgrid=True, gridcolor=THEME["border"]),
             yaxis2=dict(title="Avg CO₂ (kg)", overlaying="y", side="right",
-                        gridcolor=THEME["border"]),
+                        showgrid=False, gridcolor=THEME["border"]),
         )
         st.plotly_chart(fig_sn, use_container_width=True)
 
